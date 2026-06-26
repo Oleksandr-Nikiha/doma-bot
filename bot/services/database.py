@@ -1,0 +1,33 @@
+import asyncpg
+from bot.config import settings
+
+
+class Database:
+    def __init__(self):
+        self.pool: asyncpg.Pool | None = None
+
+    async def connect(self):
+        self.pool = await asyncpg.create_pool(
+            dsn=settings.postgres_dsn,
+            min_size=2,
+            max_size=10,
+        )
+
+    async def disconnect(self):
+        if self.pool:
+            await self.pool.close()
+
+    async def fetch(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.fetch(query, *args)
+
+    async def fetchrow(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(query, *args)
+
+    async def execute(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.execute(query, *args)
+
+
+db = Database()
