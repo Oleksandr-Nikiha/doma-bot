@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from bot.services.messages import get_message
 
-from bot.models.user import get_user_by_tgid
+from bot.models.user import User
 from bot.models.order import get_draft_order
 from bot.models.order_item import (
     get_order_items, 
@@ -60,8 +60,7 @@ async def _handle_empty_cart(target: Message | CallbackQuery, state: FSMContext,
     await message.answer(text=text, reply_markup=main_menu_keyboard())
 
 
-async def _refresh_cart(query: CallbackQuery, state: FSMContext):
-    user = await get_user_by_tgid(query.from_user.id)
+async def _refresh_cart(query: CallbackQuery, state: FSMContext, user: User):
     result = await _get_cart_content(user.user_id)
 
     if not result:
@@ -75,8 +74,7 @@ async def _refresh_cart(query: CallbackQuery, state: FSMContext):
         await query.message.edit_text(text=text, reply_markup=cart_keyboard(order_items))
 
 
-async def _show_cart_on_def(message: Message, state: FSMContext):
-    user = await get_user_by_tgid(message.from_user.id)
+async def _show_cart_on_def(message: Message, state: FSMContext, user: User):
     result = await _get_cart_content(user.user_id)
 
     if not result:
@@ -89,18 +87,17 @@ async def _show_cart_on_def(message: Message, state: FSMContext):
 
 
 @router.message(Command("cart"))
-async def view_cart_on_command(message: Message, state: FSMContext):
-    await _show_cart_on_def(message, state)
+async def view_cart_on_command(message: Message, state: FSMContext, user: User):
+    await _show_cart_on_def(message, state, user)
 
 
 @router.message(F.text == '🧺 Кошик')
-async def view_cart_on_menu(message: Message, state: FSMContext):
-    await _show_cart_on_def(message, state)
+async def view_cart_on_menu(message: Message, state: FSMContext, user: User):
+    await _show_cart_on_def(message, state, user)
 
 
 @router.callback_query(NavCD.filter(F.to == 'cart'))
-async def view_cart_on_product(query: CallbackQuery, state: FSMContext):    
-    user = await get_user_by_tgid(query.from_user.id)
+async def view_cart_on_product(query: CallbackQuery, state: FSMContext, user: User):    
     result = await _get_cart_content(user.user_id)
 
     if not result:
@@ -117,20 +114,19 @@ async def view_cart_on_product(query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(CartCD.filter(F.action == 'plus'), CartStates.view_cart)
-async def cart_plus_pos(query: CallbackQuery, callback_data: CartCD, state: FSMContext):
+async def cart_plus_pos(query: CallbackQuery, callback_data: CartCD, state: FSMContext, user: User):
     await add_quantity_order_item(callback_data.order_item_id)
-    await _refresh_cart(query, state)
+    await _refresh_cart(query, state, user)
 
 
 @router.callback_query(CartCD.filter(F.action == 'minus'), CartStates.view_cart)
-async def cart_minus_pos(query: CallbackQuery, callback_data: CartCD, state: FSMContext):
+async def cart_minus_pos(query: CallbackQuery, callback_data: CartCD, state: FSMContext, user: User):
     await reduce_quantity_order_item(callback_data.order_item_id)
-    await _refresh_cart(query, state)
+    await _refresh_cart(query, state, user)
 
 
 @router.callback_query(CartCD.filter(F.action == 'clear'), CartStates.view_cart)
-async def cart_clear(query: CallbackQuery, state: FSMContext):
-    user = await get_user_by_tgid(query.from_user.id)
+async def cart_clear(query: CallbackQuery, state: FSMContext, user: User):
     draft_order = await get_draft_order(user.user_id)
 
     if draft_order:
@@ -140,9 +136,8 @@ async def cart_clear(query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(NavCD.filter(F.to == 'back'), CartStates.view_cart)
-async def cart_return_to_main(query: CallbackQuery, state: FSMContext):
+async def cart_return_to_main(query: CallbackQuery, state: FSMContext, user: User):
     await state.clear()
-    user = await get_user_by_tgid(query.from_user.id)
 
     text = await get_message("commands", "start_exists", display_name=user.display_name)
 
@@ -155,5 +150,5 @@ async def cart_return_to_main(query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(NavCD.filter(F.to == 'back'), CheckoutStates.choosing_delivery)
-async def checkout_return_to_cart(query: CallbackQuery, state: FSMContext):
-    await _refresh_cart(query, state)
+async def checkout_return_to_cart(query: CallbackQuery, state: FSMContext, user: User):
+    await _refresh_cart(query, state, user)

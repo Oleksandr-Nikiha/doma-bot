@@ -12,6 +12,7 @@ from bot.models.order import get_or_create_draft_order
 from bot.models.order_item import add_item_to_order
 
 from bot.keyboards.inline import category_keyboard, items_keyboard, prices_keyboard, added_to_cart_keyboard
+from bot.data.callbacks import NavCD, CategoryCD, ItemsCD, ItemCD, PriceCD
 
 from bot.states.order import OrderStates
 
@@ -28,7 +29,7 @@ async def order_menu(message: Message, state: FSMContext):
     await message.answer(text, reply_markup=kb)
 
 
-@router.callback_query(F.data == 'nav:back', OrderStates.choosing_item)
+@router.callback_query(NavCD.filter(F.to == 'nav:back'), OrderStates.choosing_item)
 async def return_order_menu(query: CallbackQuery, state: FSMContext):
     await state.set_state(OrderStates.choosing_category)
 
@@ -54,15 +55,14 @@ async def _show_items(query: CallbackQuery, state: FSMContext, category_id: int,
     else:
         await query.message.edit_text(text=text, reply_markup=kb)
 
-@router.callback_query(F.data.startswith('cat:'), OrderStates.choosing_category)
-async def item_menu(query: CallbackQuery, state: FSMContext):
-    category_id = int(query.data.split(':')[1])
-    category = await get_category_by_id(category_id)
+@router.callback_query(CategoryCD.filter(), OrderStates.choosing_category)
+async def item_menu(query: CallbackQuery, callback_data: CategoryCD, state: FSMContext):
+    category = await get_category_by_id(callback_data.id)
 
     await _show_items(query, state, category.category_id, category.keyboard_columns)
 
 
-@router.callback_query(F.data == 'nav:back', OrderStates.choosing_size)
+@router.callback_query(NavCD.filter(F.to == 'back'), OrderStates.choosing_size)
 async def back_to_items(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     category_id = data.get('category_id')
@@ -70,11 +70,10 @@ async def back_to_items(query: CallbackQuery, state: FSMContext):
     await _show_items(query, state, category.category_id, category.keyboard_columns)
 
 
-@router.callback_query(F.data.startswith('items:'), OrderStates.choosing_item)
-async def items_page(query: CallbackQuery, state: FSMContext):
-    _, category_id, offset = query.data.split(':')
-    category_id = int(category_id)
-    offset = int(offset)
+@router.callback_query(ItemsCD.filter(), OrderStates.choosing_item)
+async def items_page(query: CallbackQuery, callback_data: ItemsCD, state: FSMContext):
+    category_id = callback_data.category_id
+    offset = callback_data.offset
 
     await state.update_data(category_id=category_id)
 
@@ -83,11 +82,11 @@ async def items_page(query: CallbackQuery, state: FSMContext):
     await query.message.edit_reply_markup(reply_markup=kb)
 
 
-@router.callback_query(F.data.startswith('item:'), OrderStates.choosing_item)
-async def choose_item(query: CallbackQuery, state: FSMContext):
+@router.callback_query(ItemCD.filter(), OrderStates.choosing_item)
+async def choose_item(query: CallbackQuery, callback_data: ItemCD, state: FSMContext):
     await state.set_state(OrderStates.choosing_size)
 
-    item_id = int(query.data.split(':')[1])
+    item_id = callback_data.id
     await state.update_data(item_id=item_id)
 
     item_db = await get_item_by_id(item_id=item_id)
@@ -105,18 +104,18 @@ async def choose_item(query: CallbackQuery, state: FSMContext):
             reply_markup=kb
         )
     else:
-        await query.message.edit_text(text=text, reply_markup=kb, parse_mode="HTML")
+        await query.message.edit_text(text=text, reply_markup=kb)
 
 
-@router.callback_query(F.data.startswith('price:'), OrderStates.choosing_size)
-async def add_to_cart(query: CallbackQuery, state: FSMContext):
+@router.callback_query(PriceCD.filter(), OrderStates.choosing_size)
+async def add_to_cart(query: CallbackQuery, callback_data: PriceCD, state: FSMContext):
     await state.set_state(OrderStates.confirming_order)
     data = await state.get_data()
 
     item_id = data.get('item_id')
     item = await get_item_by_id(item_id)
 
-    price_id = int(query.data.split(':')[1])
+    price_id = callback_data.id
     price = await get_price_by_id(price_id)
 
     tg_user = query.from_user.id
@@ -130,16 +129,17 @@ async def add_to_cart(query: CallbackQuery, state: FSMContext):
     
     await query.answer()
     if query.message.photo:
-        await query.message.edit_caption(caption=text, reply_markup=kb, parse_mode="HTML")
+        await query.message.edit_caption(caption=text, reply_markup=kb)
     else:
-        await query.message.edit_text(text=text, reply_markup=kb, parse_mode="HTML")
+        await query.message.edit_text(text=text, reply_markup=kb)
 
 
-@router.callback_query(F.data == 'nav:order_more')
+@router.callback_query(NavCD.filter(F.to == 'order_more'))
 async def order_more(query: CallbackQuery, state: FSMContext):
     await state.set_state(OrderStates.choosing_category)
     text = await get_message('order', 'category_menu')
     kb = await category_keyboard()
+    
     await query.answer()
     if query.message.photo:
         await query.message.answer(text=text, reply_markup=kb)
@@ -148,6 +148,6 @@ async def order_more(query: CallbackQuery, state: FSMContext):
         await query.message.edit_text(text=text, reply_markup=kb)
 
 
-@router.callback_query(F.data == 'nav:noop')
+@router.callback_query(NavCD.filter(F.to == 'noop'))
 async def noop_handler(query: CallbackQuery):
     await query.answer()

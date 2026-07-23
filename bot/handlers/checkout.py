@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 
 from bot.data.callbacks import CartCD, CheckoutCD, NavCD
 
-from bot.models.user import get_user_by_tgid
+from bot.models.user import User, get_user_by_tgid
 from bot.services.messages import get_message
 
 from bot.keyboards.inline import (
@@ -158,7 +158,7 @@ async def payment_card_set(query: CallbackQuery, state: FSMContext):
 
 
 # ==========================
-# 7. PROCEED BACK BUTTON
+# 8. PROCEED BACK BUTTON
 # ==========================
 
 # Enter address -> Select Delivery method

@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from bot.middlewares.user import UserMiddleware
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage
 
@@ -45,6 +46,9 @@ async def main():
     )
     
     dp = Dispatcher(storage=storage)
+
+    dp.message.middleware(UserMiddleware())
+    dp.callback_query.middleware(UserMiddleware())
 
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)

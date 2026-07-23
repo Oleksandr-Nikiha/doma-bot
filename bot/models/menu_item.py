@@ -45,7 +45,10 @@ async def get_items_count(category_id: int) -> int:
 
 
 async def save_image_item(photo_id, item_id):
-    await db.execute(
-        "UPDATE menu_items SET photo_id = $1 WHERE item_id = $2;",
-        photo_id, item_id
-    )
+    async with db.transaction() as conn:
+        result = await conn.execute(
+            "UPDATE menu_items SET photo_id = $1 WHERE item_id = $2;",
+            photo_id, item_id
+        )
+
+        return result == "UPDATE 1"
